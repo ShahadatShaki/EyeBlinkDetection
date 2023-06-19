@@ -17,19 +17,23 @@ package me.prapon.eyeblinkdetection.vision;
 
 import android.annotation.SuppressLint;
 import android.graphics.PointF;
+import android.util.Log;
 
 import com.google.android.gms.vision.Tracker;
 import com.google.android.gms.vision.face.Face;
 import com.google.android.gms.vision.face.FaceDetector;
 import com.google.android.gms.vision.face.Landmark;
 
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
+
+import me.prapon.eyeblinkdetection.ClickListener;
 
 /**
  * Tracks the eye positions and state over time, managing an underlying graphic which renders googly
  * eyes over the source video.<p>
- *
+ * <p>
  * To improve eye tracking performance, it also helps to keep track of the previous landmark
  * proportions relative to the detected face and to interpolate landmark positions for future
  * updates if the landmarks are missing.  This helps to compensate for intermediate frames where the
@@ -38,28 +42,35 @@ import java.util.Map;
  */
 public class FaceTracker extends Tracker<Face> {
     private static final float EYE_CLOSED_THRESHOLD = 0.4f;
+    int blinkCount = 0;
+    ClickListener clickListener;
+    /**
+     * Updates the positions and state of eyes to the underlying graphic, according to the most
+     * recent face detection results.  The graphic will render the eyes and simulate the motion of
+     * the iris based upon these changes over time.
+     */
 
+    long lastBlinkStored;
     private GraphicOverlay mOverlay;
     private EyesGraphics mEyesGraphics;
-
     // Record the previously seen proportions of the landmark locations relative to the bounding box
     // of the face.  These proportions can be used to approximate where the landmarks are within the
     // face bounding box if the eye landmark is missing in a future update.
     @SuppressLint("UseSparseArrays")
     private Map<Integer, PointF> mPreviousProportions = new HashMap<>();
 
+
+    //==============================================================================================
+    // Methods
+    //==============================================================================================
     // Similarly, keep track of the previous eye open state so that it can be reused for
     // intermediate frames which lack eye landmarks and corresponding eye state.
     private boolean mPreviousIsLeftOpen = true;
     private boolean mPreviousIsRightOpen = true;
 
-
-    //==============================================================================================
-    // Methods
-    //==============================================================================================
-
-    public FaceTracker(GraphicOverlay overlay) {
+    public FaceTracker(GraphicOverlay overlay, ClickListener listener) {
         mOverlay = overlay;
+        clickListener = listener;
     }
 
     /**
@@ -70,11 +81,6 @@ public class FaceTracker extends Tracker<Face> {
         mEyesGraphics = new EyesGraphics(mOverlay);
     }
 
-    /**
-     * Updates the positions and state of eyes to the underlying graphic, according to the most
-     * recent face detection results.  The graphic will render the eyes and simulate the motion of
-     * the iris based upon these changes over time.
-     */
     @Override
     public void onUpdate(FaceDetector.Detections<Face> detectionResults, Face face) {
         mOverlay.add(mEyesGraphics);
@@ -102,7 +108,17 @@ public class FaceTracker extends Tracker<Face> {
             mPreviousIsRightOpen = isRightOpen;
         }
 
-        mEyesGraphics.updateEyes(leftPosition, isLeftOpen, rightPosition, isRightOpen);
+        long timeInMil = Calendar.getInstance().getTimeInMillis();
+        if ((!mPreviousIsLeftOpen || !mPreviousIsRightOpen) && timeInMil - lastBlinkStored > 5000) {
+
+            lastBlinkStored = timeInMil;
+            blinkCount++;
+            clickListener.onClick(blinkCount, blinkCount);
+        }
+
+        Log.d("TAG", "updateEyes: mRightOpen: " + mPreviousIsRightOpen + " mLeftOpen: " + mPreviousIsLeftOpen);
+
+//        mEyesGraphics.updateEyes(leftPosition, isLeftOpen, rightPosition, isRightOpen);
     }
 
     /**

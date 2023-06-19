@@ -19,6 +19,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PointF;
+import android.util.Log;
 
 /**
  * Graphics class for rendering Googly Eyes on a graphic overlay given the current eye positions.
@@ -79,6 +80,7 @@ class EyesGraphics extends GraphicOverlay.Graphic {
 
         mRightPosition = rightPosition;
         mRightOpen = rightOpen;
+
 
         postInvalidate();
     }
