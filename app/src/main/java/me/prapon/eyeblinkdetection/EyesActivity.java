@@ -27,12 +27,12 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
@@ -62,8 +62,25 @@ public final class EyesActivity extends AppCompatActivity {
     private CameraSource mCameraSource = null;
     private CameraSourcePreview mPreview;
     private GraphicOverlay mGraphicOverlay;
+    private TextView countTV;
 
     private boolean mIsFrontFacing = true;
+    /**
+     * Toggles between front-facing and rear-facing modes.
+     */
+    private View.OnClickListener mFlipButtonListener = new View.OnClickListener() {
+        public void onClick(View v) {
+            mIsFrontFacing = !mIsFrontFacing;
+
+            if (mCameraSource != null) {
+                mCameraSource.release();
+                mCameraSource = null;
+            }
+
+            createCameraSource();
+            startCameraSource();
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -73,6 +90,7 @@ public final class EyesActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mPreview = findViewById(R.id.preview);
+        countTV = findViewById(R.id.count);
         mGraphicOverlay = findViewById(R.id.faceOverlay);
 
         // Check for the camera permission before accessing the camera.  If the
@@ -102,13 +120,8 @@ public final class EyesActivity extends AppCompatActivity {
 
         final Activity thisActivity = this;
 
-        View.OnClickListener listener = new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                ActivityCompat.requestPermissions(thisActivity, permissions,
-                        RC_HANDLE_CAMERA_PERM);
-            }
-        };
+        View.OnClickListener listener = view -> ActivityCompat.requestPermissions(thisActivity, permissions,
+                RC_HANDLE_CAMERA_PERM);
 
         Snackbar.make(mGraphicOverlay, R.string.permission_camera_rationale,
                 Snackbar.LENGTH_INDEFINITE)
@@ -147,7 +160,6 @@ public final class EyesActivity extends AppCompatActivity {
         }
     }
 
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
@@ -167,11 +179,7 @@ public final class EyesActivity extends AppCompatActivity {
         Log.e(TAG, "Permission not granted: results len = " + grantResults.length +
                 " Result code = " + (grantResults.length > 0 ? grantResults[0] : "(empty)"));
 
-        DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int id) {
-                finish();
-            }
-        };
+        DialogInterface.OnClickListener listener = (dialog, id) -> finish();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Face Tracker sample")
@@ -188,23 +196,6 @@ public final class EyesActivity extends AppCompatActivity {
         super.onSaveInstanceState(savedInstanceState);
         savedInstanceState.putBoolean("IsFrontFacing", mIsFrontFacing);
     }
-
-    /**
-     * Toggles between front-facing and rear-facing modes.
-     */
-    private View.OnClickListener mFlipButtonListener = new View.OnClickListener() {
-        public void onClick(View v) {
-            mIsFrontFacing = !mIsFrontFacing;
-
-            if (mCameraSource != null) {
-                mCameraSource.release();
-                mCameraSource = null;
-            }
-
-            createCameraSource();
-            startCameraSource();
-        }
-    };
 
     //==============================================================================================
     // Detector
@@ -231,18 +222,22 @@ public final class EyesActivity extends AppCompatActivity {
         if (mIsFrontFacing) {
             // For front facing mode
 
-            Tracker<Face> tracker = new FaceTracker(mGraphicOverlay);
+            Tracker<Face> tracker = new FaceTracker(mGraphicOverlay, (position, viewId) -> {
+                countTV.setText("Blink count :" + position);
+                Toast.makeText(context, "Blink count :" + position, Toast.LENGTH_SHORT).show();
+            });
             processor = new LargestFaceFocusingProcessor.Builder(detector, tracker).build();
+
+//            Toast.makeText(context, "face on camera", Toast.LENGTH_SHORT).show();
         } else {
             // For rear facing mode, a factory is used to create per-face tracker instances.
+            MultiProcessor.Factory<Face> factory = face -> new FaceTracker(mGraphicOverlay, (position, viewId) -> {
+                Toast.makeText(context, "Blink count :" + position, Toast.LENGTH_SHORT).show();
 
-            MultiProcessor.Factory<Face> factory = new MultiProcessor.Factory<Face>() {
-                @Override
-                public Tracker<Face> create(Face face) {
-                    return new FaceTracker(mGraphicOverlay);
-                }
-            };
+            });
             processor = new MultiProcessor.Builder<>(factory).build();
+//            Toast.makeText(context, "face not on camera", Toast.LENGTH_SHORT).show();
+
         }
 
         detector.setProcessor(processor);
