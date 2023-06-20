@@ -17,6 +17,26 @@
         android:textColor="#000"
         android:textSize="20sp" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <ImageView
+            android:layout_width="80dp"
+            android:id="@+id/faceImage"
+            android:layout_marginEnd="10dp"
+            android:layout_height="80dp"/>
+        <ImageView
+            android:layout_marginEnd="10dp"
+            android:layout_width="80dp"
+            android:id="@+id/faceLeft"
+            android:layout_height="80dp"/>
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_marginEnd="10dp"
+            android:id="@+id/faceRight"
+            android:layout_height="80dp"/>
+    </LinearLayout>
+
     <me.prapon.eyeblinkdetection.vision.CameraSourcePreview
         android:id="@+id/preview"
         android:layout_width="match_parent"

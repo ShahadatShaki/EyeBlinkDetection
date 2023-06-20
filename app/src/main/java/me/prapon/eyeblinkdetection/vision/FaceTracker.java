@@ -24,10 +24,12 @@ import com.google.android.gms.vision.face.Face;
 import com.google.android.gms.vision.face.FaceDetector;
 import com.google.android.gms.vision.face.Landmark;
 
+import java.sql.Types;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
+import me.prapon.eyeblinkdetection.CaptureTypes;
 import me.prapon.eyeblinkdetection.ClickListener;
 
 /**
@@ -53,6 +55,7 @@ public class FaceTracker extends Tracker<Face> {
     long lastBlinkStored;
     private GraphicOverlay mOverlay;
     private EyesGraphics mEyesGraphics;
+    private EyesGraphics mEarGraphics;
     // Record the previously seen proportions of the landmark locations relative to the bounding box
     // of the face.  These proportions can be used to approximate where the landmarks are within the
     // face bounding box if the eye landmark is missing in a future update.
@@ -68,9 +71,15 @@ public class FaceTracker extends Tracker<Face> {
     private boolean mPreviousIsLeftOpen = true;
     private boolean mPreviousIsRightOpen = true;
 
+    long lastLeftCapture = 0;
+    long lastRightCapture = 0;
     public FaceTracker(GraphicOverlay overlay, ClickListener listener) {
         mOverlay = overlay;
         clickListener = listener;
+        long timeInMil = Calendar.getInstance().getTimeInMillis();
+
+         lastLeftCapture = timeInMil;
+         lastRightCapture = timeInMil;
     }
 
     /**
@@ -79,16 +88,35 @@ public class FaceTracker extends Tracker<Face> {
     @Override
     public void onNewItem(int id, Face face) {
         mEyesGraphics = new EyesGraphics(mOverlay);
+        mEarGraphics = new EyesGraphics(mOverlay);
     }
+
 
     @Override
     public void onUpdate(FaceDetector.Detections<Face> detectionResults, Face face) {
         mOverlay.add(mEyesGraphics);
+        mOverlay.add(mEarGraphics);
+        long timeInMil = Calendar.getInstance().getTimeInMillis();
 
         updatePreviousProportions(face);
 
+        Log.d("FaceRotation", face.getEulerY()+"" );
+
+
+
+        if(face.getEulerY()<-40 && face.getEulerZ()>-20 && face.getEulerZ()<20&& timeInMil - lastLeftCapture > 2000){
+            lastLeftCapture = timeInMil;
+            clickListener.onClick(blinkCount, CaptureTypes.LEFT_FACE);
+        } else if (face.getEulerY()>40&& face.getEulerZ()>-20 && face.getEulerZ()<20 && timeInMil - lastRightCapture > 2000) {
+            lastRightCapture = timeInMil;
+            clickListener.onClick(blinkCount, CaptureTypes.RIGHT_FACE);
+        }
+
         PointF leftPosition = getLandmarkPosition(face, Landmark.LEFT_EYE);
         PointF rightPosition = getLandmarkPosition(face, Landmark.RIGHT_EYE);
+        PointF RIGHT_EAR = getLandmarkPosition(face, Landmark.RIGHT_EAR);
+        PointF LEFT_EAR = getLandmarkPosition(face, Landmark.LEFT_EAR);
+//        PointF LEFT_EAR = getLandmarkPosition(face, Landmark.LEFT_EAR);
 
         float leftOpenScore = face.getIsLeftEyeOpenProbability();
         boolean isLeftOpen;
@@ -108,17 +136,19 @@ public class FaceTracker extends Tracker<Face> {
             mPreviousIsRightOpen = isRightOpen;
         }
 
-        long timeInMil = Calendar.getInstance().getTimeInMillis();
-        if ((!mPreviousIsLeftOpen || !mPreviousIsRightOpen) && timeInMil - lastBlinkStored > 5000) {
+
+
+        if ((!mPreviousIsLeftOpen || !mPreviousIsRightOpen) && timeInMil - lastBlinkStored > 2000) {
 
             lastBlinkStored = timeInMil;
             blinkCount++;
-            clickListener.onClick(blinkCount, blinkCount);
+            clickListener.onClick(blinkCount, CaptureTypes.EYE);
         }
 
-        Log.d("TAG", "updateEyes: mRightOpen: " + mPreviousIsRightOpen + " mLeftOpen: " + mPreviousIsLeftOpen);
+//        Log.d("TAG", "updateEyes: mRightOpen: " + mPreviousIsRightOpen + " mLeftOpen: " + mPreviousIsLeftOpen);
 
 //        mEyesGraphics.updateEyes(leftPosition, isLeftOpen, rightPosition, isRightOpen);
+//        mEarGraphics.updateEyes(LEFT_EAR, isLeftOpen, RIGHT_EAR, isRightOpen);
     }
 
     /**
@@ -129,6 +159,7 @@ public class FaceTracker extends Tracker<Face> {
     @Override
     public void onMissing(FaceDetector.Detections<Face> detectionResults) {
         mOverlay.remove(mEyesGraphics);
+        mOverlay.remove(mEarGraphics);
     }
 
     /**
@@ -138,6 +169,7 @@ public class FaceTracker extends Tracker<Face> {
     @Override
     public void onDone() {
         mOverlay.remove(mEyesGraphics);
+        mOverlay.remove(mEarGraphics);
     }
 
     //==============================================================================================

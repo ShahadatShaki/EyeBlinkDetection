@@ -24,9 +24,15 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -63,6 +69,7 @@ public final class EyesActivity extends AppCompatActivity {
     private CameraSourcePreview mPreview;
     private GraphicOverlay mGraphicOverlay;
     private TextView countTV;
+    private ImageView eyeImage, leftImage, rightImage;
 
     private boolean mIsFrontFacing = true;
     /**
@@ -90,6 +97,11 @@ public final class EyesActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mPreview = findViewById(R.id.preview);
+        mPreview.setDrawingCacheEnabled(true);
+        mPreview.buildDrawingCache(true);
+        eyeImage = findViewById(R.id.faceImage);
+        leftImage = findViewById(R.id.faceLeft);
+        rightImage = findViewById(R.id.faceRight);
         countTV = findViewById(R.id.count);
         mGraphicOverlay = findViewById(R.id.faceOverlay);
 
@@ -222,9 +234,17 @@ public final class EyesActivity extends AppCompatActivity {
         if (mIsFrontFacing) {
             // For front facing mode
 
-            Tracker<Face> tracker = new FaceTracker(mGraphicOverlay, (position, viewId) -> {
-                countTV.setText("Blink count :" + position);
-                Toast.makeText(context, "Blink count :" + position, Toast.LENGTH_SHORT).show();
+            Tracker<Face> tracker = new FaceTracker(mGraphicOverlay, (position, type) -> {
+
+                countTV.setText("Blink count nasmfd:" + position);
+
+                if(type == CaptureTypes.EYE) {
+                    if (position == 2) {
+                        captureImage(type);
+                    }
+                }else {
+                    captureImage(type);
+                }
             });
             processor = new LargestFaceFocusingProcessor.Builder(detector, tracker).build();
 
@@ -260,6 +280,32 @@ public final class EyesActivity extends AppCompatActivity {
         return detector;
     }
 
+    private void captureImage(int type) {
+
+        mCameraSource.takePicture(null, new CameraSource.PictureCallback() {
+            @Override
+            public void onPictureTaken(byte[] bytes) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+
+                showImage(type, bitmap);
+
+            }
+        });
+
+
+
+    }
+
+    private void showImage(int type, Bitmap bitmap) {
+        if(type == CaptureTypes.EYE){
+            eyeImage.setImageBitmap(bitmap);
+        }else if(type == CaptureTypes.LEFT_FACE){
+            leftImage.setImageBitmap(bitmap);
+        }else if(type == CaptureTypes.RIGHT_FACE){
+            rightImage.setImageBitmap(bitmap);
+        }
+    }
+
 
     /**
      * Creates the face detector and the camera.
@@ -277,9 +323,11 @@ public final class EyesActivity extends AppCompatActivity {
         mCameraSource = new CameraSource.Builder(context, detector)
                 .setFacing(facing)
                 .setRequestedPreviewSize(320, 240)
-                .setRequestedFps(60.0f)
+                .setRequestedFps(1.0f)
                 .setAutoFocusEnabled(true)
                 .build();
+
+
     }
 
 
@@ -303,5 +351,18 @@ public final class EyesActivity extends AppCompatActivity {
                 mCameraSource = null;
             }
         }
+    }
+
+    private Bitmap viewToImage(View view) {
+        Bitmap returnedBitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(returnedBitmap);
+        Drawable bgDrawable = view.getBackground();
+        if (bgDrawable != null)
+            bgDrawable.draw(canvas);
+        else
+            canvas.drawColor(Color.WHITE);
+        view.draw(canvas);
+
+        return returnedBitmap;
     }
 }
